@@ -400,6 +400,63 @@ async def link_command(interaction: discord.Interaction):
 
 
 @bot.tree.command(
+    name="data",
+    description="Show current leaderboard data and raw JSON (admins only)",
+    guild=discord.Object(id=GUILD_ID) if GUILD_ID else None,
+)
+async def data_command(interaction: discord.Interaction):
+    # admin check
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message(
+            "You do not have permission to use this command.",
+            ephemeral=True,
+        )
+        return
+
+    # in-memory leaderboard summary
+    scores = leaderboard.get("scores", {})
+    msg_id = leaderboard.get("msg_id")
+    entries_count = len(scores)
+
+    # short preview (top 10)
+    lines = []
+    for i, (uid_str, score) in enumerate(scores.items(), start=1):
+        if i > 10:
+            lines.append(f"... and {entries_count - 10} more entries")
+            break
+        lines.append(f"{uid_str}: {score}")
+    summary = "\n".join(lines) if lines else "No scores stored."
+
+    # raw JSON from file
+    if os.path.exists(LEADERBOARD_FILE):
+        try:
+            with open(LEADERBOARD_FILE, "r") as f:
+                raw_json = f.read()
+        except Exception as e:
+            raw_json = f"Error reading file: {e}"
+    else:
+        raw_json = "File does not exist."
+
+    # trim raw_json if too long for Discord
+    if len(raw_json) > 1900:
+        raw_json = raw_json[:1900] + "\n... (truncated)"
+
+    text = (
+        f"**In-memory leaderboard data:**\n"
+        f"- Entries: `{entries_count}`\n"
+        f"- Stored leaderboard message ID: `{msg_id}`\n\n"
+        f"**Scores preview (user_id: score):**\n"
+        f"```txt\n{summary}\n```\n"
+        f"**Raw {LEADERBOARD_FILE}:**\n"
+        f"```json\n{raw_json}\n```"
+    )
+
+    await interaction.response.send_message(text, ephemeral=True)
+
+
+
+
+@bot.tree.command(
     name="submit-score",
     description="Set a player's leaderboard score (admins only)",
     guild=discord.Object(id=GUILD_ID) if GUILD_ID else None,
