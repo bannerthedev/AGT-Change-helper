@@ -46,40 +46,74 @@ def save_leaderboard(data):
 leaderboard = load_leaderboard()
 
 
-# EASIER: 4‑digit numeric code
+# 4‑digit numeric code, easy but not too weak
 def random_code(length: int = 4) -> str:
-    # 4-digit numeric code, easy to read/type
     chars = "23456789"
     return "".join(random.choice(chars) for _ in range(length))
 
 
-# EASIER: simple, clean captcha image
+# HARDER (but no rotation): more noise, jittered chars
 def generate_captcha_image(text: str) -> BytesIO:
     w, h = 260, 80
-    img = Image.new("RGB", (w, h), (255, 255, 255))
+    img = Image.new("RGB", (w, h), (250, 250, 250))
     draw = ImageDraw.Draw(img)
     try:
         font = ImageFont.truetype("arial.ttf", 42)
     except Exception:
         font = ImageFont.load_default()
 
-    # very light background lines
-    draw.line((0, h // 2, w, h // 2), fill=(220, 220, 220), width=1)
-    draw.line((w // 2, 0, w // 2, h), fill=(220, 220, 220), width=1)
+    # grid background
+    for y in range(0, h, 16):
+        draw.line((0, y, w, y), fill=(220, 220, 220), width=1)
+    for x in range(0, w, 26):
+        draw.line((x, 0, x, h), fill=(220, 220, 220), width=1)
 
-    # center plain text, no rotation
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    x = (w - text_w) // 2
-    y = (h - text_h) // 2
-    draw.text((x, y), text, font=font, fill=(0, 0, 0))
+    # random thicker lines
+    for _ in range(4):
+        x1, y1 = random.randint(0, w), random.randint(0, h)
+        x2, y2 = random.randint(0, w), random.randint(0, h)
+        color = (
+            random.randint(120, 180),
+            random.randint(120, 180),
+            random.randint(120, 180),
+        )
+        draw.line((x1, y1, x2, y2), fill=color, width=2)
 
-    # tiny amount of dots
-    for _ in range(20):
+    # measure full text
+    try:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+    except Exception:
+        text_w, text_h = draw.textsize(text, font=font)
+
+    base_x = (w - text_w) // 2
+    base_y = (h - text_h) // 2
+
+    # draw each char with slight vertical/spacing jitter
+    x = base_x
+    for ch in text:
+        try:
+            cbox = draw.textbbox((0, 0), ch, font=font)
+            ch_w = cbox[2] - cbox[0]
+        except Exception:
+            ch_w, _ = draw.textsize(ch, font=font)
+
+        offset_y = random.randint(-4, 4)
+        spacing = random.randint(0, 4)
+        color = (
+            random.randint(0, 40),
+            random.randint(0, 40),
+            random.randint(0, 40),
+        )
+        draw.text((x, base_y + offset_y), ch, font=font, fill=color)
+        x += ch_w + spacing
+
+    # more random dots
+    for _ in range(40):
         rx = random.randint(0, w)
         ry = random.randint(0, h)
-        draw.ellipse((rx, ry, rx + 1, ry + 1), fill=(180, 180, 180))
+        draw.ellipse((rx, ry, rx + 1, ry + 1), fill=(100, 100, 100))
 
     buf = BytesIO()
     img.save(buf, format="PNG")
@@ -188,7 +222,6 @@ class AnswerView(View):
     async def answer_button(
         self, interaction: discord.Interaction, button: Button
     ):
-        # Only the original user can answer
         if interaction.user.id != self.user_id:
             await interaction.response.send_message(
                 "This button is not for you.", ephemeral=True
@@ -215,7 +248,6 @@ class InitialView(View):
         code = random_code()
         captcha_store[user_id] = code
 
-        # expire after 2 minutes
         async def expire(uid):
             await asyncio.sleep(120)
             captcha_store.pop(uid, None)
@@ -241,7 +273,6 @@ async def build_leaderboard_embed():
         color=0xFF0000,
     )
 
-    # Only show users who still have the Verified role (for display only)
     display_items = []
     for uid_str, score in scores.items():
         if guild is None:
@@ -307,7 +338,6 @@ async def clear_bot_messages(channel_id: int, limit: int = 1000):
 async def on_ready():
     print(f"Logged in as {bot.user} ({bot.user.id})")
 
-    # sync slash commands
     try:
         if GUILD_ID:
             guild = discord.Object(id=GUILD_ID)
@@ -319,11 +349,9 @@ async def on_ready():
     except Exception as e:
         print("Failed to sync commands:", e)
 
-    # clear bot messages in the two channels on startup
     await clear_bot_messages(ANNOUNCE_CHANNEL_ID)
     await clear_bot_messages(LEADERBOARD_CHANNEL_ID)
 
-    # send the guide message on startup
     try:
         guide = (
             "## AGT linking guide\n\n"
@@ -339,7 +367,6 @@ async def on_ready():
     except Exception as e:
         print("Failed to send guide:", e)
 
-    # ensure leaderboard message exists (new one after clear)
     try:
         await update_leaderboard_message()
     except Exception as e:
@@ -352,7 +379,6 @@ async def on_ready():
     guild=discord.Object(id=GUILD_ID) if GUILD_ID else None,
 )
 async def link_command(interaction: discord.Interaction):
-    # Check if user is already verified
     guild = interaction.guild
     if guild is not None:
         member = guild.get_member(interaction.user.id)
@@ -363,7 +389,6 @@ async def link_command(interaction: discord.Interaction):
             )
             return
 
-    # Not verified → show guide + Verify button
     guide = (
         "## AGT linking guide\n\n"
         "To link first start off by running the command /link, when you do that "
@@ -385,7 +410,6 @@ async def link_command(interaction: discord.Interaction):
     guild=discord.Object(id=GUILD_ID) if GUILD_ID else None,
 )
 async def data_command(interaction: discord.Interaction):
-    # admin check
     if not interaction.user.guild_permissions.administrator:
         await interaction.response.send_message(
             "You do not have permission to use this command.",
@@ -393,12 +417,10 @@ async def data_command(interaction: discord.Interaction):
         )
         return
 
-    # in-memory leaderboard summary
     scores = leaderboard.get("scores", {})
     msg_id = leaderboard.get("msg_id")
     entries_count = len(scores)
 
-    # short preview (top 10)
     lines = []
     for i, (uid_str, score) in enumerate(scores.items(), start=1):
         if i > 10:
@@ -407,7 +429,6 @@ async def data_command(interaction: discord.Interaction):
         lines.append(f"{uid_str}: {score}")
     summary = "\n".join(lines) if lines else "No scores stored."
 
-    # raw JSON from file
     if os.path.exists(LEADERBOARD_FILE):
         try:
             with open(LEADERBOARD_FILE, "r") as f:
@@ -417,7 +438,6 @@ async def data_command(interaction: discord.Interaction):
     else:
         raw_json = "File does not exist."
 
-    # trim raw_json if too long for Discord
     if len(raw_json) > 1900:
         raw_json = raw_json[:1900] + "\n... (truncated)"
 
@@ -452,9 +472,8 @@ async def submit_score(
         )
         return
 
-    # TEMP: allow setting scores even if they don't have Verified role,
-    # so we can confirm storage works.
-    # If you want to enforce Verified later, re-enable this check:
+    # TEMP: Verified check disabled so you can confirm storage works
+    # Re-enable later if you want to restrict:
     # if not any(r.id == VERIFIED_ROLE_ID for r in person.roles):
     #     await interaction.response.send_message(
     #         f"{person.mention} does not have the Verified role, so they cannot be on the leaderboard.",
