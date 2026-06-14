@@ -46,51 +46,40 @@ def save_leaderboard(data):
 leaderboard = load_leaderboard()
 
 
-def random_code(length: int = 6) -> str:
-    chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+# EASIER: 4‑digit numeric code
+def random_code(length: int = 4) -> str:
+    # 4-digit numeric code, easy to read/type
+    chars = "23456789"
     return "".join(random.choice(chars) for _ in range(length))
 
 
+# EASIER: simple, clean captcha image
 def generate_captcha_image(text: str) -> BytesIO:
-    w, h = 300, 100
-    img = Image.new("RGB", (w, h), (240, 240, 240))
+    w, h = 260, 80
+    img = Image.new("RGB", (w, h), (255, 255, 255))
     draw = ImageDraw.Draw(img)
     try:
-        font = ImageFont.truetype("arial.ttf", 48)
+        font = ImageFont.truetype("arial.ttf", 42)
     except Exception:
         font = ImageFont.load_default()
 
-    # noise lines
-    for _ in range(6):
-        x1, y1 = random.randint(0, w), random.randint(0, h)
-        x2, y2 = random.randint(0, w), random.randint(0, h)
-        color = tuple(random.randint(50, 180) for _ in range(3))
-        draw.line((x1, y1, x2, y2), fill=color, width=2)
+    # very light background lines
+    draw.line((0, h // 2, w, h // 2), fill=(220, 220, 220), width=1)
+    draw.line((w // 2, 0, w // 2, h), fill=(220, 220, 220), width=1)
 
-    # helper for char size using textbbox (Pillow 10+)
-    def char_size(ch: str):
-        bbox = draw.textbbox((0, 0), ch, font=font)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
+    # center plain text, no rotation
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    x = (w - text_w) // 2
+    y = (h - text_h) // 2
+    draw.text((x, y), text, font=font, fill=(0, 0, 0))
 
-    total_width = sum(char_size(c)[0] for c in text)
-    start_x = (w - total_width) // 2
-    x = start_x
-    for ch in text:
-        ch_w, ch_h = char_size(ch)
-        char_img = Image.new("RGBA", (ch_w + 10, h), (0, 0, 0, 0))
-        char_draw = ImageDraw.Draw(char_img)
-        color = (27, 94, 32)
-        char_draw.text((5, (h - ch_h) // 2), ch, font=font, fill=color)
-        angle = random.uniform(-30, 30)
-        char_img = char_img.rotate(angle, resample=Image.BILINEAR, expand=1)
-        img.paste(char_img, (x, 0), char_img)
-        x += ch_w
-
-    # dots
-    for _ in range(60):
+    # tiny amount of dots
+    for _ in range(20):
         rx = random.randint(0, w)
         ry = random.randint(0, h)
-        draw.ellipse((rx, ry, rx + 1, ry + 1), fill=(0, 0, 0))
+        draw.ellipse((rx, ry, rx + 1, ry + 1), fill=(180, 180, 180))
 
     buf = BytesIO()
     img.save(buf, format="PNG")
@@ -223,7 +212,7 @@ class InitialView(View):
         self, interaction: discord.Interaction, button: Button
     ):
         user_id = interaction.user.id
-        code = random_code(6)
+        code = random_code()
         captcha_store[user_id] = code
 
         # expire after 2 minutes
