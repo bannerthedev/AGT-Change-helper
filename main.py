@@ -2,6 +2,7 @@
 import random
 import json
 import os
+import dotenv
 import asyncio
 from io import BytesIO
 
@@ -10,9 +11,12 @@ from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button, Modal, TextInput
 from PIL import Image, ImageDraw, ImageFont
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # ---- CONFIG ----
-TOKEN = "MTUxNTgxODI0MjIzNTQzNzIwNw.GjBhgl.EIWSUotAMCmmGr71-19ol6A7TkSeaNE7Efj2Bw"
 GUILD_ID = 1495226742124843048  # your server ID
 ANNOUNCE_CHANNEL_ID = 1512630051869425694  # how-to-get-linked channel
 LEADERBOARD_CHANNEL_ID = 1510834005518585957  # leaderboard channel
@@ -438,4 +442,4 @@ async def submit_score(
 
 
 if __name__ == "__main__":
-    bot.run(TOKEN)
+    bot.run(os.getenv("TOKEN"))
