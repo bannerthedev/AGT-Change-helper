@@ -257,16 +257,17 @@ async def build_leaderboard_embed():
         color=0xFF0000,
     )
 
-    filtered_items = []
+    # Only show users who still have the Verified role (for display only)
+    display_items = []
     for uid_str, score in scores.items():
         if guild is None:
-            filtered_items.append((uid_str, score))
+            display_items.append((uid_str, score))
             continue
         member = guild.get_member(int(uid_str))
         if member and any(r.id == VERIFIED_ROLE_ID for r in member.roles):
-            filtered_items.append((uid_str, score))
+            display_items.append((uid_str, score))
 
-    sorted_items = sorted(filtered_items, key=lambda kv: (-kv[1], int(kv[0])))
+    sorted_items = sorted(display_items, key=lambda kv: (-kv[1], int(kv[0])))
 
     if not sorted_items:
         embed.description = "No players yet."
@@ -280,11 +281,6 @@ async def build_leaderboard_embed():
                 mention = f"<@{uid_str}>"
             lines.append(f"{i}. {mention} — {score}")
         embed.description = "\n".join(lines)
-
-    if guild is not None:
-        new_scores = {uid: s for uid, s in filtered_items}
-        leaderboard["scores"] = new_scores
-        save_leaderboard(leaderboard)
 
     return embed
 
