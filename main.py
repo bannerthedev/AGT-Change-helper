@@ -2,7 +2,6 @@
 import random
 import json
 import os
-import dotenv
 import asyncio
 from io import BytesIO
 
@@ -11,10 +10,6 @@ from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button, Modal, TextInput
 from PIL import Image, ImageDraw, ImageFont
-from dotenv import load_dotenv
-
-load_dotenv()
-
 
 # ---- CONFIG ----
 GUILD_ID = 1495226742124843048  # your server ID
@@ -450,8 +445,6 @@ async def data_command(interaction: discord.Interaction):
     await interaction.response.send_message(text, ephemeral=True)
 
 
-
-
 @bot.tree.command(
     name="submit-score",
     description="Set a player's leaderboard score (admins only)",
@@ -470,12 +463,15 @@ async def submit_score(
         )
         return
 
-    if not any(r.id == VERIFIED_ROLE_ID for r in person.roles):
-        await interaction.response.send_message(
-            f"{person.mention} does not have the Verified role, so they cannot be on the leaderboard.",
-            ephemeral=True,
-        )
-        return
+    # TEMP: allow setting scores even if they don't have Verified role,
+    # so we can confirm storage works.
+    # If you want to enforce Verified later, re-enable this check:
+    # if not any(r.id == VERIFIED_ROLE_ID for r in person.roles):
+    #     await interaction.response.send_message(
+    #         f"{person.mention} does not have the Verified role, so they cannot be on the leaderboard.",
+    #         ephemeral=True,
+    #     )
+    #     return
 
     if points < 0:
         await interaction.response.send_message(
